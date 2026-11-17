@@ -149,6 +149,32 @@ function TerminFormular() {
                   />
                 </div>
 
+
+                {/* Email*/}
+                <div 
+                style={{
+                  display:"flex",
+                  flexDirection:"column",
+                  gap:"5px",
+                  gridColumn: "1 / -1"
+                  
+                }}>
+                  <label>Email</label>
+                  <input type="Email"
+                  placeholder="example@gmail.com"
+                  style={{
+                    backgroundColor: "white",
+                    color: "black",
+                    padding: "12px 24px",
+                    border: "1px solid #ccc",
+                    borderRadius: "8px",
+                    fontSize: "15px",
+                    marginRight:"30px", 
+                    width:"100%",
+                    boxSizing: "border-box",
+                  }}></input>
+                </div>
+
                 {/* Datum */}
                 <div
                   style={{
