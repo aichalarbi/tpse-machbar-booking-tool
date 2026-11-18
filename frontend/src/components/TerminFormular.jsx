@@ -1,19 +1,130 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 
-const zeitSlots = [
-  "08:00 - 10:00",
-  "10:00 - 12:00",
-  "12:00 - 14:00",
-  "14:00 - 16:00",
-  "16:00 - 18:00",
-  "18:00 - 20:00",
-];
 
 function TerminFormular() {
+  // Controls whether the booking popup is visible.
   const [formularOffen, setFormularOffen] = useState(false);
-  const [ausgewaehlterSlot, setAusgewaehlterSlot] = useState(null);
+
+  // Stores the student's selected time slot ID.
+  const [ausgewaehlterSlot, setAusgewaehlterSlot] = useState("");
+
+  // Stores the selected date.
+  const [datum, setDatum] = useState("2026-11-18");
+
+  // Stores the time slots received from the backend.
+  const [zeitSlots, setZeitSlots] = useState([]);
+
+  // Indicates whether the backend is currently loading the slots.
+  const [laden, setLaden] = useState(false);
+
+  // Stores error messages.
+  const [fehler, setFehler] = useState("");
+
+  // Stores the student's first name.
+  const [name, setName] = useState("");
+
+  // Stores the student's last name.
+  const [nachname, setNachname] = useState("");
+
+  // Stores the student's email address.
+  const [email, setEmail] = useState("");
+
+  // Stores the booking success or error message.
+  const [buchungsMeldung, setBuchungsMeldung] = useState("");
+
+  //creates a counter. Every time we increase it, React knows that something has changed
+  const [aktualisierung, setAktualisierung] = useState(0);
+
+  // Whenever the selected date changes, request its time slots from the backend.
+  useEffect(() => {
+
+    async function ladeZeitSlots() {
+      setLaden(true);
+      setFehler("");
+
+      try {
+        // Send a GET request to our Express backend.
+        const response = await fetch(
+          `http://localhost:3000/api/slots?date=${datum}`
+        );
+
+        // Convert the JSON response into JavaScript data.
+        const data = await response.json();
+
+        // Check whether the backend returned an error.
+        if (!response.ok) {
+          throw new Error(data.message || "Fehler beim Laden.");
+        }
+
+        // Save the received time slots in React state.
+        setZeitSlots(data);
+
+        // Reset the previously selected slot.
+        setAusgewaehlterSlot("");
+
+      } catch (error) {
+        setFehler(error.message);
+        setZeitSlots([]);
+
+      } finally {
+        setLaden(false);
+      }
+    }
+
+    ladeZeitSlots();
+
+  }, [datum, aktualisierung]); 
+  /*Now the GET request runs when:
+- The selected date changes.
+- The refresh counter changes.*/
+
+  // Sends the booking information to the backend.
+  async function terminSpeichern() {
+
+    // 1. Check whether all fields are filled in.
+    if (!name.trim() || !nachname.trim() || !email.trim() || !datum || !ausgewaehlterSlot) {
+      setBuchungsMeldung("Bitte füllen Sie alle Felder aus.");
+      return;
+    }
+
+    try {
+      // 2. Send the booking to the Express backend.
+      const response = await fetch("http://localhost:3000/api/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: name,
+          nachname: nachname,
+          email: email,
+          datum: datum,
+          slotId: Number(ausgewaehlterSlot)
+        })
+      });
+
+      // 3. Read the response from the backend.
+      const data = await response.json();
+
+      // 4. Check whether the booking was successful.
+      if (!response.ok) {
+        setBuchungsMeldung(data.message || "Buchung fehlgeschlagen.");
+        return;
+      }
+
+      // 5. Display the success message.
+      setBuchungsMeldung(data.message);
+
+      // 6. Refresh the available time slots.
+      setAktualisierung(prev => prev + 1);
+
+    } catch (error) {
+      // This happens if the backend cannot be reached.
+      setBuchungsMeldung("Backend nicht erreichbar.");
+    }
+  }
 
   return (
     <>
@@ -111,6 +222,9 @@ function TerminFormular() {
                   <label>Name</label>
                   <input
                     type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Vorname"
                     style={{
                       backgroundColor: "white",
                       color: "black",
@@ -135,6 +249,9 @@ function TerminFormular() {
                   <label>Nachname</label>
                   <input
                     type="text"
+                    value={nachname}
+                    onChange={(e) => setNachname(e.target.value)}
+                    placeholder="Nachname"
                     style={{
                       backgroundColor: "white",
                       color: "black",
@@ -161,6 +278,8 @@ function TerminFormular() {
                 }}>
                   <label>Email</label>
                   <input type="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="example@gmail.com"
                   style={{
                     backgroundColor: "white",
@@ -187,6 +306,9 @@ function TerminFormular() {
                   <label>Datum</label>
                   <input
                     type="date"
+                    //React now knows which date the user selected. Changing it automatically triggers the GET request.
+                    value={datum}
+                    onChange={(e) => setDatum(e.target.value)}
                     style={{
                       backgroundColor: "white",
                       color: "black",
@@ -213,10 +335,9 @@ function TerminFormular() {
                   <label>Verfügbare Zeitfenster</label>
 
                   <select
-                    value={ausgewaehlterSlot ?? ""}
-                    onChange={(e) =>
-                      setAusgewaehlterSlot(e.target.value)
-                    }
+                    value={ausgewaehlterSlot}
+                    onChange={(e) => setAusgewaehlterSlot(e.target.value)}
+                    disabled={laden}
                     style={{
                       backgroundColor: "white",
                       color: "black",
@@ -230,12 +351,15 @@ function TerminFormular() {
                     }}
                   >
                     <option value="" disabled>
-                      Zeit auswählen
+                      {laden ? "Zeitfenster werden geladen..." : "Zeit auswählen"}
                     </option>
 
-                    {zeitSlots.map((slot) => (
-                      <option key={slot} value={slot}>
-                        {slot}
+                    {zeitSlots
+                      .filter((slot) => slot.availableSpots > 0)
+                      .map((slot) => (
+                        <option key={slot.slotId} value={slot.slotId}>
+                          {slot.startTime} - {slot.endTime}
+                          {" "}({slot.availableSpots} Plätze frei)
                       </option>
                     ))}
                   </select>
@@ -252,7 +376,7 @@ function TerminFormular() {
                 }}
               >
                 <button
-                  onClick={() => setFormularOffen(false)}
+                  onClick={terminSpeichern}
                   style={{
                     backgroundColor: "#e65405",
                     color: "white",
@@ -265,6 +389,10 @@ function TerminFormular() {
                 >
                   Termin speichern
                 </button>
+                
+                {/*If buchungsMeldung contains text, display it.If it is empty, display nothing.*/}
+                {buchungsMeldung && (<p>{buchungsMeldung}</p>)}
+              
               </div>
             </div>
           </div>,
